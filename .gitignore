@@ -1,0 +1,19 @@
+# 构建产物
+build/
+public/
+*.log
+
+# 永远不进公开仓库的东西（导出脚本另有白名单，这里是第二道保险）
+.claude/
+docs/
+dist/
+_archive/
+**/_archive/
+
+# 运行时数据（程序旁边的 CyberDog-data\，2.0 起；改名前叫 Jdog-data）
+CyberDog-data/
+Jdog-data/
+
+# 本机
+*.tmp
+overlay/res/jdog_preview.png

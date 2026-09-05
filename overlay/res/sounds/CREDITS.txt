@@ -1,0 +1,12 @@
+Sound clips in this folder are cut from recordings by Joseph SARDIN, BigSoundBank.com, published under CC0 1.0 (public domain).
+No attribution is required by the license; this file is a thank-you and a record of provenance.
+
+bark.wav       from "Small dog barking" (s0612), 1.62 s + 0.70 s
+bark_soft.wav  from "Small dog barking" (s0612), 11.47 s + 0.70 s, gain 0.55
+whimper.wav    from "Dogs barking and crying #2" (s1545), 14.88 s + 0.70 s, gain 0.55
+pant.wav       from "Dogs Breathing" (s1547), 2.0 s + 1.5 s, gain 0.6
+sniff.wav      from "Dogs Breathing" (s1547), 6.0 s + 0.55 s, gain 0.6
+
+All converted to 16-bit mono 22050 Hz with tools/mp3towav.cpp (Media Foundation decoder, linear resample, 10 ms fades).
+Sounds without a clip here (happy hum, bounce, clatter, shake, step, pee, kick, snore) are synthesized at runtime from core/src/sound_synth.cpp.
+The exe embeds these files as RCDATA resources 200 + SoundId (see overlay/res/cyberdog.rc); overlay/src/audio.cpp prefers a resource and falls back to synthesis.

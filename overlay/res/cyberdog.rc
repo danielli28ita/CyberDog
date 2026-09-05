@@ -1,0 +1,47 @@
+// Version resource. Unsigned executables without version info are what antivirus
+// heuristics flag first; this block is the cheapest thing we can do about it.
+// ASCII only: rc.exe reads this file in the system code page.
+
+#include <windows.h>
+
+// Application icon: the evil beagle face, drawn by tools/make_icon.py.
+// The first icon resource is what Explorer shows for the exe; the tray loads it by this id.
+#define IDI_JDOG 101
+IDI_JDOG ICON "cyberdog.ico"
+
+// Recorded sound clips (CC0, see sounds/CREDITS.txt). Resource id = 200 + SoundId (core/sound_synth.h).
+// audio.cpp loads these first and synthesizes the rest.
+200 RCDATA "sounds/bark.wav"
+201 RCDATA "sounds/whimper.wav"
+203 RCDATA "sounds/pant.wav"
+208 RCDATA "sounds/sniff.wav"
+209 RCDATA "sounds/bark_soft.wav"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+ FILEFLAGS      0
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       VFT_APP
+ FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "Ldy"
+            VALUE "FileDescription",  "CyberDog desktop pet"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "CyberDog"
+            VALUE "LegalCopyright",   "Ldy. Private build."
+            VALUE "OriginalFilename", "CyberDog.exe"
+            VALUE "ProductName",      "CyberDog"
+            VALUE "ProductVersion",   "1.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
