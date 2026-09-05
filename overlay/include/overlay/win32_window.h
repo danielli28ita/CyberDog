@@ -58,6 +58,8 @@ public:
     void show_no_activate();
     void hide();
     void move_to(POINT pt);
+    // 挪到另一块显示器并改客户区尺寸（多屏拖狗用）。不激活。
+    bool set_bounds(RECT r);
 
     // 处理待办消息。返回 false 表示收到了退出请求。
     bool pump();

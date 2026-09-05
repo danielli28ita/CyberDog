@@ -1,8 +1,13 @@
 // 用户数据目录与存档文件读写。
 //
-// 2.0 起：数据放在程序旁边的 CyberDog-data\ 目录（作者要求「和程序同目录，方便清理」）。
-// 程序目录不可写（装在 Program Files 之类）时退回 %LOCALAPPDATA%\CyberDog。第一次切换时把老位置（Jdog 时代）的文件搬过来。
-// 占用：cyberdog.ini 不到 1 KB，备忘录一行一条，已看过且过期 7 天的自动清掉；没有日志文件。
+// 1.1：启动时优先用程序同目录的 CyberDog-data\。
+// 找不到 cyberdog.ini 时弹出选择：新建狗 / 从其他目录导入 / 退出。
+// 不再静默从 %LOCALAPPDATA% 搬数据。
+//
+// 测试用环境变量（跳过对话框）：
+//   PET_DATA_DIR=路径     强制使用该目录
+//   PET_NEW_DOG=1         在程序旁新建空数据目录
+//   PET_IMPORT_DIR=路径   从该目录复制到程序旁 CyberDog-data\
 
 #pragma once
 
@@ -10,19 +15,19 @@
 
 namespace pet::win {
 
-// 数据目录（UTF-8，不带末尾反斜杠）。
+// 在读存档之前调用一次。返回 false = 用户取消，进程应退出。
+bool ensure_data_ready();
+
+// 数据目录（UTF-8，不带末尾反斜杠）。须先 ensure_data_ready。
 std::string data_dir();
 
-// 存档文件的完整路径（UTF-8）。目录不存在会建。
+// 存档文件的完整路径（UTF-8）。
 std::string save_path();
 
-// 插件自己的存档路径：同一目录下的 <pluginId>.txt。插件 id 只允许字母数字点和下划线。
+// 插件自己的存档路径：同一目录下的 <pluginId>.txt。
 std::string plugin_data_path(const char* pluginId);
 
-// 读整个文件。不存在返回 false。
 bool read_text_file(const std::string& path, std::string& out);
-
-// 写整个文件。先写临时文件再改名，中途断电不会留下半个存档。
 bool write_text_file(const std::string& path, const std::string& text);
 
 }  // namespace pet::win

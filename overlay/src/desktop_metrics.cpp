@@ -24,12 +24,10 @@ TaskbarEdge edge_from_abe(UINT abe) {
 
 }  // namespace
 
-DesktopMetrics query(HWND hwnd) {
+DesktopMetrics query_monitor(HMONITOR mon) {
     DesktopMetrics m;
+    if (!mon) mon = MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
 
-    // 工作区与 DPI 都跟显示器走，不用全局值，多显示器下才正确。
-    HMONITOR mon = hwnd ? MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
-                        : MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
     MONITORINFO mi{sizeof(MONITORINFO)};
     if (GetMonitorInfoW(mon, &mi)) {
         m.workArea = mi.rcWork;
@@ -41,14 +39,50 @@ DesktopMetrics query(HWND hwnd) {
         m.dpi = dx;
     }
 
-    // 任务栏状态。ABM_GETTASKBARPOS 给的是主任务栏，够 P1 用；
-    // 副屏的 Shell_SecondaryTrayWnd 留到 设计文档 §2.2 边界 6 再处理。
-    APPBARDATA abd{};
-    abd.cbSize = sizeof(abd);
-    if (SHAppBarMessage(ABM_GETTASKBARPOS, &abd)) {
-        m.taskbar      = abd.rc;
-        m.edge         = edge_from_abe(abd.uEdge);
+    // 任务栏：优先取与本显示器同屏的 Shell_TrayWnd / Shell_SecondaryTrayWnd；
+    // 找不到再退回 ABM_GETTASKBARPOS（通常是主屏）。
+    struct TrayFind {
+        HMONITOR mon = nullptr;
+        RECT     rc{};
+        bool     found = false;
+    } trayFind;
+    trayFind.mon = mon;
+    EnumWindows(
+        [](HWND h, LPARAM lp) -> BOOL {
+            auto* d = reinterpret_cast<TrayFind*>(lp);
+            wchar_t cls[64]{};
+            GetClassNameW(h, cls, 64);
+            if (wcscmp(cls, L"Shell_TrayWnd") != 0 && wcscmp(cls, L"Shell_SecondaryTrayWnd") != 0)
+                return TRUE;
+            if (MonitorFromWindow(h, MONITOR_DEFAULTTONULL) != d->mon) return TRUE;
+            if (!IsWindowVisible(h)) return TRUE;
+            GetWindowRect(h, &d->rc);
+            d->found = true;
+            return FALSE;
+        },
+        reinterpret_cast<LPARAM>(&trayFind));
+
+    if (trayFind.found) {
+        m.taskbar = trayFind.rc;
         m.taskbarValid = true;
+        const LONG tw = trayFind.rc.right - trayFind.rc.left;
+        const LONG th = trayFind.rc.bottom - trayFind.rc.top;
+        if (th <= tw && trayFind.rc.bottom >= m.monitor.bottom - 2) m.edge = TaskbarEdge::Bottom;
+        else if (th <= tw && trayFind.rc.top <= m.monitor.top + 2) m.edge = TaskbarEdge::Top;
+        else if (tw < th && trayFind.rc.left <= m.monitor.left + 2) m.edge = TaskbarEdge::Left;
+        else if (tw < th && trayFind.rc.right >= m.monitor.right - 2) m.edge = TaskbarEdge::Right;
+        else m.edge = TaskbarEdge::Bottom;
+    } else {
+        APPBARDATA abd{};
+        abd.cbSize = sizeof(abd);
+        if (SHAppBarMessage(ABM_GETTASKBARPOS, &abd)) {
+            RECT inter{};
+            if (IntersectRect(&inter, &abd.rc, &m.monitor)) {
+                m.taskbar = abd.rc;
+                m.edge = edge_from_abe(abd.uEdge);
+                m.taskbarValid = true;
+            }
+        }
     }
 
     APPBARDATA st{};
@@ -56,14 +90,21 @@ DesktopMetrics query(HWND hwnd) {
     const UINT_PTR state = SHAppBarMessage(ABM_GETSTATE, &st);
     m.taskbarAutoHide = (state & ABS_AUTOHIDE) != 0;
 
-    // 通知区域：Shell_TrayWnd 下的 TrayNotifyWnd。用来把栖位让开时钟和托盘图标。
     if (HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr)) {
-        if (HWND notify = FindWindowExW(tray, nullptr, L"TrayNotifyWnd", nullptr)) {
-            GetWindowRect(notify, &m.notifyArea);
+        if (MonitorFromWindow(tray, MONITOR_DEFAULTTONULL) == mon) {
+            if (HWND notify = FindWindowExW(tray, nullptr, L"TrayNotifyWnd", nullptr)) {
+                GetWindowRect(notify, &m.notifyArea);
+            }
         }
     }
 
     return m;
+}
+
+DesktopMetrics query(HWND hwnd) {
+    HMONITOR mon = hwnd ? MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+                        : MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+    return query_monitor(mon);
 }
 
 POINT dock_position(const DesktopMetrics& m, int winW, int winH, int embedPx) {
@@ -90,37 +131,12 @@ POINT dock_position(const DesktopMetrics& m, int winW, int winH, int embedPx) {
 }
 
 bool fullscreen_or_presenting() {
-    // 投影模式与独占全屏的 D3D 还是问系统。
-    // 不再看 QUNS_BUSY：系统判「忙」的依据是「有一个盖满显示器的置顶窗口」，
-    // 而 1.2 起覆盖层自己就是这样一个窗口。1.4 用它的结果是每 2 秒把自己藏起来、
-    // 系统随即说「不忙」、再显示、再被判忙——作者看到的就是狗一秒一闪。
+    // 只信系统明确给出的两种：独占全屏游戏、投影/幻灯片。
+    // 不再自己比较前台窗是否盖满显示器——最大化 Chrome/资源管理器/VS 等会误藏。
+    // 也不看 QUNS_BUSY：覆盖层自己就是盖满显示器的置顶窗，会被判忙（1.5）。
     QUERY_USER_NOTIFICATION_STATE s{};
-    if (SUCCEEDED(SHQueryUserNotificationState(&s)) &&
-        (s == QUNS_RUNNING_D3D_FULL_SCREEN || s == QUNS_PRESENTATION_MODE)) {
-        return true;
-    }
-
-    // 全屏应用：前台窗口属于别的进程，且它的矩形盖满了自己所在的显示器。
-    // 桌面（Progman / WorkerW）和任务栏不算。
-    HWND fg = GetForegroundWindow();
-    if (!fg || !IsWindowVisible(fg) || IsIconic(fg)) return false;
-    DWORD pid = 0;
-    GetWindowThreadProcessId(fg, &pid);
-    if (pid == GetCurrentProcessId()) return false;
-    wchar_t cls[64]{};
-    GetClassNameW(fg, cls, 64);
-    if (wcscmp(cls, L"Progman") == 0 || wcscmp(cls, L"WorkerW") == 0 ||
-        wcscmp(cls, L"Shell_TrayWnd") == 0 || wcscmp(cls, L"Shell_SecondaryTrayWnd") == 0) {
-        return false;
-    }
-    MONITORINFO mi{};
-    mi.cbSize = sizeof(mi);
-    HMONITOR mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
-    if (!mon || !GetMonitorInfoW(mon, &mi)) return false;
-    RECT wr{};
-    if (!GetWindowRect(fg, &wr)) return false;
-    return wr.left <= mi.rcMonitor.left && wr.top <= mi.rcMonitor.top &&
-           wr.right >= mi.rcMonitor.right && wr.bottom >= mi.rcMonitor.bottom;
+    if (FAILED(SHQueryUserNotificationState(&s))) return false;
+    return s == QUNS_RUNNING_D3D_FULL_SCREEN || s == QUNS_PRESENTATION_MODE;
 }
 
 }  // namespace pet::win

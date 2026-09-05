@@ -35,6 +35,15 @@ bool D3DContext::ensure_ready() {
     return true;
 }
 
+bool D3DContext::resize(UINT width, UINT height) {
+    if (width == 0 || height == 0) return false;
+    if (width == width_ && height == height_ && swap_) return true;
+    width_ = width;
+    height_ = height;
+    release_swapchain();
+    return ensure_ready();
+}
+
 bool D3DContext::create_device() {
     UINT factoryFlags = 0;
     if (debugLayer_) {

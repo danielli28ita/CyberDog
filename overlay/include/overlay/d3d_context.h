@@ -56,6 +56,9 @@ public:
     // 释放到哪一级都能靠它醒回来。
     bool ensure_ready();
 
+    // 换显示器时改交换链尺寸。设备保留，只重建 swapchain / DComp / 回读缓冲。
+    bool resize(UINT width, UINT height);
+
     // 开始一帧。返回当前后台缓冲的 RTV 句柄，并把资源转到 RENDER_TARGET。
     // 未初始化时返回 false。
     bool begin_frame(D3D12_CPU_DESCRIPTOR_HANDLE* outRtv, ID3D12GraphicsCommandList** outCmd);

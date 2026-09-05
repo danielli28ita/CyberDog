@@ -78,6 +78,15 @@ void OverlayWindow::move_to(POINT pt) {
                  SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
+bool OverlayWindow::set_bounds(RECT r) {
+    if (!hwnd_) return false;
+    width_ = r.right - r.left;
+    height_ = r.bottom - r.top;
+    if (width_ <= 0 || height_ <= 0) return false;
+    return SetWindowPos(hwnd_, HWND_TOPMOST, r.left, r.top, width_, height_,
+                        SWP_NOACTIVATE) != 0;
+}
+
 void OverlayWindow::set_region(HRGN rgn) {
     if (hwnd_) SetWindowRgn(hwnd_, rgn, FALSE);
 }

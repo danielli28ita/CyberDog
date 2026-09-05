@@ -10,6 +10,14 @@
 
 一条住在 Windows 任务栏上的 3D 比格犬。它站在任务栏上，后腿被任务栏挡住、前腿踩在任务栏前面，像趴在栏杆上。默认待在屏幕右下角，不打扰你干活。
 
+## 1.1 有什么新的
+
+- 最大化普通窗口时不再把狗藏掉；只有独占全屏 / 投影才会隐藏。
+- 可以把狗拖到扩展显示器，位置会记住。
+- 启动优先读 exe 旁边的存档；没有存档时可选新建或从别的文件夹导入。
+
+（旧版 [1.0](https://github.com/danielli28ita/CyberDog/releases/tag/v1.0) 仍可下载，不会被删掉。）
+
 ## 它会做什么
 
 - **自己过日子**：发呆、伸懒腰、抖毛、坐下、卖萌、闲逛、玩网球、扑光标、打翻食盆、冲向屏幕、趴下睡觉（睡觉时跳上垫子，打轻轻的呼噜）。
@@ -37,12 +45,12 @@
 
 ## 数据放在哪
 
-所有数据放在 exe 旁边的 `CyberDog-data\` 文件夹里（程序目录不可写时退到 `%LOCALAPPDATA%\Jdog\`）。里面只有两个小文件：
+启动时优先用 exe 旁边的 `CyberDog-data\`。没有 `cyberdog.ini`（或旧名 `jdog.ini`）时会问你：新建一条狗、从其他文件夹导入、或取消退出。程序目录不可写时，新建/导入会退到 `%LOCALAPPDATA%\CyberDog\`。里面主要是：
 
 - `cyberdog.ini`：名字、性格、亲密度、设置、常驻位置、计数，不到 1 KB。
 - `plugin.memo.txt`：备忘录，看过且过期一周的自动清掉。
 
-没有日志文件。删掉整个文件夹就是一条新狗。
+没有日志文件。删掉整个文件夹再启动，等于重新选新建或导入。
 
 ## 自己编译
 
@@ -71,6 +79,14 @@ MIT，见 `LICENSE`。天气数据来自 [Open-Meteo](https://open-meteo.com/)�
 
 A 3D beagle that lives on the Windows taskbar. Its hind legs are hidden behind the taskbar and its front paws rest on it, like a dog leaning on a railing. It stays in the bottom-right corner by default and keeps out of your way.
 
+## What’s new in 1.1
+
+- No longer hides when you only maximize a normal window; only exclusive fullscreen / presentation mode hides it.
+- Drag it onto an extended monitor; the spot is remembered across restarts.
+- Prefers save data next to the exe; if none is found, you can create a new dog or import from another folder.
+
+(Older [1.0](https://github.com/danielli28ita/CyberDog/releases/tag/v1.0) stays available.)
+
 ## What it does
 
 - **Lives its own life**: idles, stretches, shakes, sits, acts cute, wanders, plays with a tennis ball, pounces on the cursor, flips its bowl, charges the screen, lies down to sleep (on a cushion, with a quiet snore).
@@ -98,12 +114,12 @@ Tray icon menu: rename, sound on/off, notes, weather city, language (中文 / En
 
 ## Where the data lives
 
-Everything is in `CyberDog-data\` next to the exe (falls back to `%LOCALAPPDATA%\Jdog\` if the program folder is not writable). Two small files:
+On launch it prefers `CyberDog-data\` next to the exe. If there is no `cyberdog.ini` (or legacy `jdog.ini`), it asks: create a new dog, import from another folder, or cancel. If the program folder is not writable, create/import falls back to `%LOCALAPPDATA%\CyberDog\`. Main files:
 
 - `cyberdog.ini`: name, personality, affinity, settings, home position, counters. Under 1 KB.
 - `plugin.memo.txt`: notes; seen notes older than a week are pruned.
 
-No log files. Delete the folder for a new dog.
+No log files. Delete the folder and relaunch to choose create or import again.
 
 ## Build it yourself
 

@@ -304,7 +304,12 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    // ---- 存档 ----
+    // ---- 存档：同目录 CyberDog-data 优先；没有则询问新建或导入 ----
+    if (!pet::win::ensure_data_ready()) {
+        std::printf("  未选择数据目录，退出。\n");
+        if (single) { ReleaseMutex(single); CloseHandle(single); }
+        return 0;
+    }
     pet::SaveData save;
     const std::string savePath = pet::win::save_path();
     {
@@ -366,37 +371,51 @@ int main(int argc, char** argv) {
 
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    // 1.2 起覆盖层窗口是整个主显示器：狗不再被一个框限住，球能飞到屏幕任何地方。
-    // 透明区点击穿透，所以全屏窗口不挡任何东西。
-    const auto metrics = pet::win::query(nullptr);
-    const int kWinW = metrics.monitor.right - metrics.monitor.left;
-    const int kWinH = metrics.monitor.bottom - metrics.monitor.top;
+    // 覆盖层跟狗所在的那块显示器一样大。巢位用虚拟桌面像素存（nest_vx / nest_vy），
+    // 启动时落到对应显示器；没有存档就落主屏右下角。
+    const float nestVxSaved = save.get_float("nest_vx", 1e9f);
+    const float nestVySaved = save.get_float("nest_vy", 1e9f);
+    POINT nestProbe{};
+    if (nestVxSaved < 1e8f && nestVySaved < 1e8f) {
+        nestProbe = {static_cast<LONG>(nestVxSaved), static_cast<LONG>(nestVySaved)};
+    } else {
+        const auto primary = pet::win::query(nullptr);
+        nestProbe = {primary.monitor.right - 80, primary.monitor.bottom - 40};
+    }
+    auto metrics = pet::win::query_monitor(MonitorFromPoint(nestProbe, MONITOR_DEFAULTTONEAREST));
+    int winW = metrics.monitor.right - metrics.monitor.left;
+    int winH = metrics.monitor.bottom - metrics.monitor.top;
     pet::win::OverlayWindow win;
-    if (!win.create(L"CyberDog", kWinW, kWinH)) return 1;
+    if (!win.create(L"CyberDog", winW, winH)) return 1;
     win.move_to({metrics.monitor.left, metrics.monitor.top});
 
     // 狗的基准画框仍按 1.0 的算法摆在右下角栖位，压进任务栏 18 px。
-    const POINT dock = pet::win::dock_position(metrics, kFrameW, kFrameH, kEmbedPx);
-    const POINT dockClient{dock.x - metrics.monitor.left, dock.y - metrics.monitor.top};
-    std::printf("  显示器 %dx%d，栖位画框 %ld,%ld（DPI %u，缩放 %.0f%%）\n",
-                kWinW, kWinH, dock.x, dock.y, metrics.dpi, metrics.dpi * 100.0 / 96.0);
-    const float dpiScale = static_cast<float>(metrics.dpi) / 96.0f;
+    POINT dock = pet::win::dock_position(metrics, kFrameW, kFrameH, kEmbedPx);
+    POINT dockClient{dock.x - metrics.monitor.left, dock.y - metrics.monitor.top};
+    std::printf("  显示器 %dx%d @ (%ld,%ld)，栖位画框 %ld,%ld（DPI %u，缩放 %.0f%%）\n",
+                winW, winH, metrics.monitor.left, metrics.monitor.top, dock.x, dock.y,
+                metrics.dpi, metrics.dpi * 100.0 / 96.0);
+    float dpiScale = static_cast<float>(metrics.dpi) / 96.0f;
     // 看得见的任务栏顶边（客户区坐标）。窗口矩形顶边再往下 7 逻辑像素，见 set_clip 处的说明。
-    const int taskbarVisibleTop = metrics.taskbar.top - metrics.monitor.top + static_cast<int>(7.0f * dpiScale);
+    int taskbarVisibleTop = metrics.taskbarValid
+        ? metrics.taskbar.top - metrics.monitor.top + static_cast<int>(7.0f * dpiScale)
+        : winH;
 
     pet::gfx::D3DContext gfx;
-    if (!gfx.init(win.hwnd(), static_cast<UINT>(kWinW), static_cast<UINT>(kWinH), /*enableDebugLayer=*/false)) return 1;
+    if (!gfx.init(win.hwnd(), static_cast<UINT>(winW), static_cast<UINT>(winH), /*enableDebugLayer=*/false)) return 1;
 
     const pet::Mesh mesh = pet::build_proxy_beagle();
     pet::gfx::MeshRenderer renderer;
-    if (!renderer.init(gfx.device(), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<UINT>(kWinW), static_cast<UINT>(kWinH), mesh)) return 1;
+    if (!renderer.init(gfx.device(), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<UINT>(winW), static_cast<UINT>(winH), mesh)) return 1;
 
     // 任务栏遮挡：渲染裁剪到任务栏顶边（设计文档 §2.2，P1 任务 6 的遮挡部分）。
     if (metrics.taskbarValid && !metrics.taskbarAutoHide && metrics.edge == pet::win::TaskbarEdge::Bottom) {
         // Win11 任务栏窗口矩形比看得见的任务栏高一条（本机 150% 下是 11 px），
         // 按窗口矩形裁会在脚和任务栏之间留一条空隙。栏杆线用「看得见的顶边」：矩形顶边再往下 7 逻辑像素。
         // 用 tools/pixel_column.ps1 量的。
-        renderer.set_clip(RECT{0, 0, kWinW, taskbarVisibleTop});
+        renderer.set_clip(RECT{0, 0, winW, taskbarVisibleTop});
+    } else {
+        renderer.set_clip(RECT{0, 0, winW, winH});
     }
     std::printf("  [ok] 代理体已上传：%u 顶点 %u 索引 %zu 个部件\n",
                 renderer.vertex_count(), renderer.index_count(), mesh.parts.size());
@@ -458,61 +477,65 @@ int main(int argc, char** argv) {
     bool mousePressed = false;
     POINT mousePos{};
 
-    // ---- 相机与投影 ----
-    // 相机沿基准方向拉远 kWinH/kFrameH 倍，视角不变。
-    const float camK = static_cast<float>(kWinH) / static_cast<float>(kFrameH);
-    const pet::Vec3 eyeBase = kTarget + (kEye - kTarget) * camK;
-    const pet::Mat4 projBase = pet::perspective(kFovY, static_cast<float>(kWinW) / static_cast<float>(kWinH), 0.1f, 200.0f);
-    // 用 1.0 的相机算出地面原点在基准画框里的像素位置，摆到栖位画框上，
-    // 再算新投影下需要的 NDC 平移，写进投影矩阵的第 3 行（clip = ... + z·shift，即镜头平移）。
-    pet::Mat4 proj = projBase;
-    float ppu = 244.0f;   // 每个模型单位多少像素，下面实测
-    {
+    // ---- 相机与投影（换显示器时重算）----
+    pet::Vec3 eyeBase = kTarget + (kEye - kTarget) * (static_cast<float>(winH) / static_cast<float>(kFrameH));
+    pet::Mat4 proj = pet::perspective(kFovY, static_cast<float>(winW) / static_cast<float>(winH), 0.1f, 200.0f);
+    float ppu = 244.0f;
+    auto rebuild_stage = [&](float preferHomeX, bool clampHome) {
+        dock = pet::win::dock_position(metrics, kFrameW, kFrameH, kEmbedPx);
+        dockClient = {dock.x - metrics.monitor.left, dock.y - metrics.monitor.top};
+        dpiScale = static_cast<float>(metrics.dpi) / 96.0f;
+        taskbarVisibleTop = metrics.taskbarValid
+            ? metrics.taskbar.top - metrics.monitor.top + static_cast<int>(7.0f * dpiScale)
+            : winH;
+        if (metrics.taskbarValid && !metrics.taskbarAutoHide && metrics.edge == pet::win::TaskbarEdge::Bottom)
+            renderer.set_clip(RECT{0, 0, winW, taskbarVisibleTop});
+        else
+            renderer.set_clip(RECT{0, 0, winW, winH});
+
+        const float camK = static_cast<float>(winH) / static_cast<float>(kFrameH);
+        eyeBase = kTarget + (kEye - kTarget) * camK;
+        const pet::Mat4 projBase = pet::perspective(kFovY, static_cast<float>(winW) / static_cast<float>(winH), 0.1f, 200.0f);
+        proj = projBase;
         const pet::Mat4 oldVP = pet::look_at(kEye, kTarget, {0, 1, 0}) *
                                 pet::perspective(kFovY, static_cast<float>(kFrameW) / static_cast<float>(kFrameH), 0.1f, 50.0f);
         float ox, oy, nx, ny;
         project_ndc(oldVP, {0, 0, 0}, ox, oy);
         const float px = static_cast<float>(dockClient.x) + (ox * 0.5f + 0.5f) * kFrameW;
-        // 竖向不再按画框摆：地面原点直接放到任务栏顶边，下面再按后脚的位置微调。
-        // 1.6 及以前按画框摆，脚和任务栏之间空一条（作者反馈「既没被挡又不显示狗的空间」）。
         (void)oy;
         const float py = static_cast<float>(taskbarVisibleTop);
-        const float wantX = px / static_cast<float>(kWinW) * 2.0f - 1.0f;
-        const float wantY = 1.0f - py / static_cast<float>(kWinH) * 2.0f;
+        const float wantX = px / static_cast<float>(winW) * 2.0f - 1.0f;
+        const float wantY = 1.0f - py / static_cast<float>(winH) * 2.0f;
         const pet::Mat4 newVP = pet::look_at(eyeBase, kTarget, {0, 1, 0}) * projBase;
         project_ndc(newVP, {0, 0, 0}, nx, ny);
         proj.m[2][0] += wantX - nx;
         proj.m[2][1] += wantY - ny;
-        // 像素/单位：投影 (1,0,0) 与 (0,0,0) 的横向差。
-        // 栏杆效果：后脚（z=-0.34）要在任务栏顶边之下 14 px（按 DPI 放大），前脚更低，被画在任务栏上面。
-        // 相机俯视，后脚在画面里比原点高，所以整体还要往下推一点。
         {
             const pet::Mat4 vp1 = pet::look_at(eyeBase, kTarget, {0, 1, 0}) * proj;
             float hx, hy;
             project_ndc(vp1, {0, 0, -0.34f}, hx, hy);
-            const float hindY = (0.5f - hy * 0.5f) * static_cast<float>(kWinH);
+            const float hindY = (0.5f - hy * 0.5f) * static_cast<float>(winH);
             const float wantHindY = static_cast<float>(taskbarVisibleTop) + 14.0f * dpiScale;
-            proj.m[2][1] -= (wantHindY - hindY) / static_cast<float>(kWinH) * 2.0f;
+            proj.m[2][1] -= (wantHindY - hindY) / static_cast<float>(winH) * 2.0f;
         }
         const pet::Mat4 vp2 = pet::look_at(eyeBase, kTarget, {0, 1, 0}) * proj;
         float ax, ay, bx, by;
         project_ndc(vp2, {0, 0, 0}, ax, ay);
         project_ndc(vp2, {1, 0, 0}, bx, by);
-        ppu = std::fabs(bx - ax) * 0.5f * static_cast<float>(kWinW);
-        // 舞台范围：模型 +x 是屏幕左。两边各留 160 px。
-        const float originPx = (ax * 0.5f + 0.5f) * static_cast<float>(kWinW);
-        player.set_stage(-((static_cast<float>(kWinW) - originPx) - 160.0f) / ppu, (originPx - 160.0f) / ppu);
-        std::printf("  舞台：%.0f 像素/单位，x ∈ [%.1f, %.1f]\n", ppu, player.stage_min(), player.stage_max());
-        // 巢在右下角：舞台右端再往里 0.25（原大时右边缘离屏幕边约 80 px），就是时钟上方。
-        // 用户拖过之后存档里有 home_x，就用它（夹回舞台范围）。
+        ppu = std::fabs(bx - ax) * 0.5f * static_cast<float>(winW);
+        const float originPx = (ax * 0.5f + 0.5f) * static_cast<float>(winW);
+        player.set_stage(-((static_cast<float>(winW) - originPx) - 160.0f) / ppu, (originPx - 160.0f) / ppu);
         const float defaultHome = player.stage_min() + 0.25f;
-        const float homeX = homeXSaved > 1e8f ? defaultHome : pet::clampf(homeXSaved, player.stage_min(), player.stage_max());
+        float homeX = preferHomeX > 1e8f ? defaultHome : preferHomeX;
+        if (clampHome) homeX = pet::clampf(homeX, player.stage_min(), player.stage_max());
         player.set_home(homeX, 0.0f);
-        // 冲屏方向：舞台原点指向相机（xz 平面）。
         const float vx = eyeBase.x, vz = eyeBase.z;
         const float vn = std::sqrt(vx * vx + vz * vz);
         player.set_toward_viewer(vx / vn, vz / vn);
-    }
+        std::printf("  舞台：%.0f 像素/单位，x ∈ [%.1f, %.1f]，巢 %.2f\n",
+                    ppu, player.stage_min(), player.stage_max(), homeX);
+    };
+    rebuild_stage(homeXSaved, true);
     pet::Vec3 parallax{0, 0, 0};   // 光标视差：相机随光标微微平移
 
     pet::win::IdleController idle;
@@ -756,7 +779,7 @@ int main(int argc, char** argv) {
             rd->rdh.iType = RDH_RECTANGLES;
             rd->rdh.nCount = static_cast<DWORD>(rects.size());
             rd->rdh.nRgnSize = 0;
-            rd->rdh.rcBound = RECT{0, 0, kWinW, kWinH};
+            rd->rdh.rcBound = RECT{0, 0, winW, winH};
             std::memcpy(rd->Buffer, rects.data(), rects.size() * sizeof(RECT));
             if (HRGN r2 = ExtCreateRegion(nullptr, static_cast<DWORD>(bytes), rd)) { DeleteObject(rgn); rgn = r2; }
         }
@@ -951,11 +974,16 @@ int main(int argc, char** argv) {
                 win.hide();
                 bubble.hide();
                 idle.set_visible(false, now);
-                std::printf("  全屏应用：隐藏\n");
+                std::printf("  独占全屏/投影：隐藏\n");
             } else if (!fs && fullscreenHidden) {
                 fullscreenHidden = false;
-                if (petVisible && !lockedHidden) { win.show_no_activate(); idle.set_visible(true, now); }
-                std::printf("  全屏结束：恢复\n");
+                if (petVisible && !lockedHidden) {
+                    win.show_no_activate();
+                    SetWindowPos(win.hwnd(), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    lastTopmostMs = now;
+                    idle.set_visible(true, now);
+                }
+                std::printf("  全屏结束：恢复并重贴置顶\n");
             }
         }
         // 启动天气：自我介绍说完（约 9 秒）再查，避免和命名提醒抢气泡。
@@ -965,7 +993,8 @@ int main(int argc, char** argv) {
         }
 
         // 始终在最上层：有些程序会把自己设成置顶盖住我们，每 2 秒重新贴一次。不激活。
-        if (petVisible && now - lastTopmostMs >= 10000) {
+        // 1.1 从前是 10 秒，作者反馈「不在最上层」——间隔太长。
+        if (petVisible && !fullscreenHidden && !lockedHidden && now - lastTopmostMs >= 2000) {
             SetWindowPos(win.hwnd(), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             lastTopmostMs = now;
         }
@@ -1086,7 +1115,7 @@ int main(int argc, char** argv) {
                 if (!gfx.ensure_ready()) { std::printf("  [FAIL] 醒来时重建图形资源失败\n"); break; }
             }
             if (st == pet::win::PowerState::Rendering && !renderer.ready()) {
-                if (!renderer.init(gfx.device(), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<UINT>(kWinW), static_cast<UINT>(kWinH), mesh)) {
+                if (!renderer.init(gfx.device(), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<UINT>(winW), static_cast<UINT>(winH), mesh)) {
                     std::printf("  [FAIL] 醒来时重建渲染器失败\n");
                     break;
                 }
@@ -1109,7 +1138,7 @@ int main(int argc, char** argv) {
             if (fxTagUntilMs != 0) capBy(fxTagUntilMs);
             if (save.dirty()) capBy(lastSaveMs + 30000);
             if (http.inflight() > 0 || (!weatherRequested && !weatherCity.empty())) capBy(now + 500);
-            if (petVisible) capBy(lastTopmostMs + 10000);
+            if (petVisible) capBy(lastTopmostMs + 2000);
             capBy(lastFullscreenCheckMs + 2000);
             ++idleWakes;
             pet::win::wait_message_timeout(wait);
@@ -1222,10 +1251,52 @@ int main(int argc, char** argv) {
                     break;
                 case pet::Gesture::DragMove:
                     if (dragging) {
+                        // 拖到另一块显示器：覆盖层跟着过去，狗停在光标下。
+                        {
+                            HMONITOR want = MonitorFromPoint(cur, MONITOR_DEFAULTTONEAREST);
+                            HMONITOR have = MonitorFromWindow(win.hwnd(), MONITOR_DEFAULTTONEAREST);
+                            if (want && want != have) {
+                                auto next = pet::win::query_monitor(want);
+                                const int nw = next.monitor.right - next.monitor.left;
+                                const int nh = next.monitor.bottom - next.monitor.top;
+                                if (nw > 0 && nh > 0 && win.set_bounds(next.monitor)) {
+                                    metrics = next;
+                                    winW = nw;
+                                    winH = nh;
+                                    if (!gfx.resize(static_cast<UINT>(winW), static_cast<UINT>(winH))) {
+                                        std::printf("  [FAIL] 换屏时重建交换链失败\n");
+                                        break;
+                                    }
+                                    renderer.release();
+                                    if (!renderer.init(gfx.device(), DXGI_FORMAT_B8G8R8A8_UNORM,
+                                                       static_cast<UINT>(winW), static_cast<UINT>(winH), mesh)) {
+                                        std::printf("  [FAIL] 换屏时重建渲染器失败\n");
+                                        break;
+                                    }
+                                    rebuild_stage(1e9f, true);
+                                    // 狗放到光标正下方（客户区）。
+                                    float ax, ay;
+                                    project_ndc(pet::look_at(eyeBase, kTarget, {0, 1, 0}) * proj, {0, 0, 0}, ax, ay);
+                                    const float originPx = (ax * 0.5f + 0.5f) * static_cast<float>(winW);
+                                    const float clientX = static_cast<float>(cur.x - metrics.monitor.left);
+                                    const float clientY = static_cast<float>(cur.y - metrics.monitor.top);
+                                    const float stageX = pet::clampf(-(clientX - originPx) / ppu,
+                                                                     player.stage_min(), player.stage_max());
+                                    player.drag_to(stageX);
+                                    groundY = pet::clampf((static_cast<float>(taskbarVisibleTop) - clientY) / ppu,
+                                                          0.0f, static_cast<float>(winH) / ppu - 1.6f);
+                                    dragOrigin = cur;
+                                    prevScene = {};
+                                    lastReadbackRect = {};
+                                    std::printf("  换到显示器 %dx%d @ (%ld,%ld)\n",
+                                                winW, winH, metrics.monitor.left, metrics.monitor.top);
+                                }
+                            }
+                        }
                         // 拖狗：按光标的位移移动狗，偏移不累积（V-P1-2）。屏幕右 = 模型 -x，屏幕上 = 地面抬高。
                         player.drag_to(player.dog().x - static_cast<float>(cur.x - dragOrigin.x) / ppu);
                         groundY = pet::clampf(groundY + static_cast<float>(dragOrigin.y - cur.y) / ppu, 0.0f,
-                                              static_cast<float>(kWinH) / ppu - 1.6f);
+                                              static_cast<float>(winH) / ppu - 1.6f);
                         dragOrigin = cur;
                     }
                     break;
@@ -1236,7 +1307,19 @@ int main(int argc, char** argv) {
                     player.set_home(player.dog().x, 0.0f);
                     save.set_float("home_x", player.dog().x);
                     save.set_float("home_y", groundY);
-                    std::printf("  拖到 x=%.2f 抬高 %.2f，作为新的巢\n", player.dog().x, groundY);
+                    // 虚拟桌面像素：换屏重启后还能回到同一块显示器。
+                    {
+                        float ax, ay;
+                        project_ndc(pet::look_at(eyeBase, kTarget, {0, 1, 0}) * proj, {0, 0, 0}, ax, ay);
+                        const float originPx = (ax * 0.5f + 0.5f) * static_cast<float>(winW);
+                        const float nestClientX = originPx - player.dog().x * ppu;
+                        const float nestClientY = static_cast<float>(taskbarVisibleTop) - groundY * ppu;
+                        save.set_float("nest_vx", static_cast<float>(metrics.monitor.left) + nestClientX);
+                        save.set_float("nest_vy", static_cast<float>(metrics.monitor.top) + nestClientY);
+                    }
+                    std::printf("  拖到 x=%.2f 抬高 %.2f，作为新的巢（屏 %.0f,%.0f）\n",
+                                player.dog().x, groundY,
+                                save.get_float("nest_vx", 0), save.get_float("nest_vy", 0));
                     break;
                 case pet::Gesture::Release:
                     if (gesture.petting()) {}
@@ -1253,7 +1336,7 @@ int main(int argc, char** argv) {
         {
             float ax, ay;
             project_ndc(pet::look_at(eyeBase, kTarget, {0, 1, 0}) * proj, {0, 0, 0}, ax, ay);
-            originPx = (ax * 0.5f + 0.5f) * static_cast<float>(kWinW);
+            originPx = (ax * 0.5f + 0.5f) * static_cast<float>(winW);
         }
         if (cursorInside) {
             ctx.cursorStageX = -(static_cast<float>(curClient.x) - originPx) / ppu;
@@ -1264,8 +1347,8 @@ int main(int argc, char** argv) {
         {
             pet::Vec3 goal{0, 0, 0};
             if (cursorOnScreen && !ignoreCursor) {
-                const float nx = (static_cast<float>(curClient.x) / static_cast<float>(kWinW) - 0.5f) * 2.0f;
-                const float ny = (static_cast<float>(curClient.y) / static_cast<float>(kWinH) - 0.5f) * 2.0f;
+                const float nx = (static_cast<float>(curClient.x) / static_cast<float>(winW) - 0.5f) * 2.0f;
+                const float ny = (static_cast<float>(curClient.y) / static_cast<float>(winH) - 0.5f) * 2.0f;
                 goal = {-nx * 0.9f, -ny * 0.5f, 0.0f};
             }
             parallax.x = pet::approach(parallax.x, goal.x, dt, 0.35f);
@@ -1372,7 +1455,7 @@ int main(int argc, char** argv) {
             float shiftTarget = 0.0f;
             if (sleeping && prevScene.right > prevScene.left) {
                 const float rightUnshifted = static_cast<float>(prevScene.right) + sleepShiftX * ppu;
-                const float edge = static_cast<float>(kWinW) - 10.0f * dpiScale;
+                const float edge = static_cast<float>(winW) - 10.0f * dpiScale;
                 shiftTarget = pet::clampf((rightUnshifted - edge) / ppu, 0.0f, 2.0f);   // +x 是屏幕左
             }
             sleepShiftX = pet::approach(sleepShiftX, shiftTarget, dt, 0.35f);
@@ -1384,9 +1467,9 @@ int main(int argc, char** argv) {
 
         // 头与整条狗的屏幕矩形，下一帧手势判定、回读区域、气泡锚点用。
         headRect = project_box(partWorld[static_cast<int>(pet::Part::Head)], viewProjEff,
-                               {-0.24f, 0.74f, 0.50f}, {0.24f, 1.16f, 1.12f}, kWinW, kWinH, 8);
+                               {-0.24f, 0.74f, 0.50f}, {0.24f, 1.16f, 1.12f}, winW, winH, 8);
         dogRect = project_box(partWorld[static_cast<int>(pet::Part::Body)], viewProjEff,
-                              {-0.45f, -0.05f, -0.75f}, {0.45f, 1.30f, 1.25f}, kWinW, kWinH, 12);
+                              {-0.45f, -0.05f, -0.75f}, {0.45f, 1.30f, 1.25f}, winW, winH, 12);
         UnionRect(&dogRect, &dogRect, &headRect);
         headTop = {metrics.monitor.left + (headRect.left + headRect.right) / 2, metrics.monitor.top + headRect.top};
         if (host.bubbleUntilMs != 0) bubble.move_anchor(headTop);
@@ -1395,13 +1478,13 @@ int main(int argc, char** argv) {
         // 脏矩形：这一帧和上一帧画过的所有东西（狗、球、碗、一滩、阴影）的并集。
         {
             RECT scene = project_box(partWorld[static_cast<int>(pet::Part::Body)], viewProjEff,
-                                     {-0.9f, -0.2f, -1.0f}, {0.9f, 1.6f, 1.6f}, kWinW, kWinH, 16);
+                                     {-0.9f, -0.2f, -1.0f}, {0.9f, 1.6f, 1.6f}, winW, winH, 16);
             const pet::Part props[] = {pet::Part::Ball, pet::Part::Bowl, pet::Part::Puddle, pet::Part::ShadowBall,
                                        pet::Part::Heart0, pet::Part::Heart1, pet::Part::Heart2, pet::Part::Heart3, pet::Part::Mat};
             for (pet::Part pr : props) {
                 if (poses[static_cast<int>(pr)].scale.x <= 0.001f) continue;
                 RECT r = project_box(partWorld[static_cast<int>(pr)], viewProjEff,
-                                     {-0.3f, -0.05f, -0.3f}, {0.3f, 0.3f, 0.3f}, kWinW, kWinH, 12);
+                                     {-0.3f, -0.05f, -0.3f}, {0.3f, 0.3f, 0.3f}, winW, winH, 12);
                 UnionRect(&scene, &scene, &r);
             }
             RECT dirty = scene;
@@ -1411,7 +1494,7 @@ int main(int argc, char** argv) {
                                            std::abs(scene.right - prevScene.right), std::abs(scene.bottom - prevScene.bottom)});
                 sceneSpeedPx = (std::min)(sceneSpeedPx, 96);
             }
-            RECT full{0, 0, kWinW, kWinH};
+            RECT full{0, 0, winW, winH};
             IntersectRect(&dirty, &dirty, &full);
             gfx.set_dirty_rect(dirty);
             prevScene = scene;
