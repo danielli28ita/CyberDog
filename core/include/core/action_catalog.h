@@ -22,6 +22,7 @@ struct ActionSpec {
     bool        selectable;        // 参与 L1 自选。否则只由宿主 / 插件触发
     float       baseDuration;      // 秒。0 表示由 start() 按情况定
     // 打分。性格权重顺序：外向、黏人、好奇、懒散、胆小、活泼、捣蛋、卖萌。
+    // 1.2：权重表冻结；额外倍率见 personality_behavior_scale（默认 1）。
     float wPersonality[8];
     // 需求权重顺序：精力、社交、好奇、无聊。想表达「精力低时想做」就给精力负权重加常数。
     float wNeeds[4];

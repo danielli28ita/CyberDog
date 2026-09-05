@@ -19,6 +19,7 @@
 #include "overlay/audio.h"
 #include "overlay/user_data.h"
 #include "overlay/rename_dialog.h"
+#include "overlay/personality_dialog.h"
 #include "overlay/stats_panel.h"
 #include "overlay/memo_dialog.h"
 #include "overlay/http.h"
@@ -55,7 +56,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.1";   // CyberDog 版本号（改名前的 Jdog 版本号到 2.0 为止，定名后从 1.0 重新计）
+constexpr const char* kVersion = "1.3";   // CyberDog 版本号（改名前的 Jdog 版本号到 2.0 为止，定名后从 1.0 重新计）
 
 // 开机自启：HKCU\Software\Microsoft\Windows\CurrentVersion\Run 下一个键。用户自己在托盘菜单里开关。
 constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -420,12 +421,23 @@ int main(int argc, char** argv) {
     std::printf("  [ok] 代理体已上传：%u 顶点 %u 索引 %zu 个部件\n",
                 renderer.vertex_count(), renderer.index_count(), mesh.parts.size());
 
-    const pet::Personality p = pet::personality_from_seed(seed);
-    std::printf("  性格（邪恶比格基线 ±%.2f）捣蛋=%.2f 好奇=%.2f 卖萌=%.2f 活泼=%.2f 懒散=%.2f 胆小=%.2f\n",
-                pet::kPersonalitySpread, p.mischief, p.curiosity, p.charm,
-                p.liveliness, p.laziness, p.timidity);
-    std::printf("  亲密度 %.1f  第 %llu 次启动  累计摸 %llu 打 %llu 玩球 %llu\n",
-                bond.affinity(), launches, totalPets, totalHits, totalBalls);
+    const pet::Personality pSeeded = pet::personality_from_seed(seed);
+    pet::Personality p = pSeeded;
+    if (!pet::personality_try_load(save, p)) {
+        p = pSeeded;
+        pet::personality_save(save, p);
+    }
+    int topA = 0, topB = 1;
+    pet::personality_top2(p, &topA, &topB);
+    static const pet::Str kTraitStr[8] = {
+        pet::Str::TraitExtroversion, pet::Str::TraitClinginess, pet::Str::TraitCuriosity, pet::Str::TraitLaziness,
+        pet::Str::TraitTimidity, pet::Str::TraitLiveliness, pet::Str::TraitMischief, pet::Str::TraitCharm};
+    std::printf("  性格摘要：%s · %s（邪恶比格基线 ±%.2f）\n",
+                pet::tr(kTraitStr[topA]), pet::tr(kTraitStr[topB]), pet::kPersonalitySpread);
+    std::printf("  性格细项 捣蛋=%.2f 好奇=%.2f 卖萌=%.2f 活泼=%.2f 懒散=%.2f 胆小=%.2f\n",
+                p.mischief, p.curiosity, p.charm, p.liveliness, p.laziness, p.timidity);
+    std::printf("  亲密度 Lv.%d · %.1f/%g 点  第 %llu 次启动  累计摸 %llu 打 %llu 玩球 %llu\n",
+                bond.level(), bond.affinity(), pet::Bond::kMax, launches, totalPets, totalHits, totalBalls);
 
     float idleSeconds = pet::idle_timeout_seconds(p);
     if (idleOverrideSeconds > 0) idleSeconds = static_cast<float>(idleOverrideSeconds);
@@ -555,6 +567,7 @@ int main(int argc, char** argv) {
     pet::win::BubbleWindow fxTag;      // 「好感度 +1」小标签，和心一起出
     ULONGLONG fxTagUntilMs = 0;
     pet::win::RenameDialog rename;
+    pet::win::PersonalityDialog personalityDlg;
     pet::win::MemoDialog memoDialog;
     pet::win::StatsPanel statsPanel;   // 属性面板，右键狗打开
     std::function<void()> openStatsPanel;   // 托盘菜单也能开；整理行的函数在存档变量都齐了之后才定义
@@ -596,6 +609,27 @@ int main(int argc, char** argv) {
                     idle.request_burst(GetTickCount64(), 1500);
                     audio.play(pet::SoundId::Bark);
                 });
+                break;
+            case pet::win::TrayCommand::Personality:
+                personalityDlg.open(p, seed, metrics.dpi,
+                    [&](const pet::Personality& np, bool rerolled, std::uint64_t newSeed) {
+                        p = np;
+                        pet::personality_enforce_invariants(p);
+                        if (rerolled) {
+                            seed = newSeed;
+                            save.set_u64("seed", seed);
+                        }
+                        pet::personality_save(save, p);
+                        selector.set_personality(p);
+                        gaze.set_personality(p);
+                        audio.prepare(0.9f + 0.25f * p.liveliness, seed ^ 0x50DAull);
+                        idleSeconds = pet::idle_timeout_seconds(p);
+                        if (idleOverrideSeconds > 0) idleSeconds = static_cast<float>(idleOverrideSeconds);
+                        int a = 0, b = 1;
+                        pet::personality_top2(p, &a, &b);
+                        std::printf("  性格已更新：%s · %s%s\n", pet::tr(kTraitStr[a]), pet::tr(kTraitStr[b]),
+                                    rerolled ? "（重新随机）" : "");
+                    });
                 break;
             case pet::win::TrayCommand::ToggleSound:
                 soundOn = !soundOn;
@@ -888,8 +922,15 @@ int main(int argc, char** argv) {
             return (tb - ta) / (10000000LL * 86400LL);
         };
         using pet::Str;
-        const Str tierId = bond.affinity() < 20 ? Str::Tier0 : bond.affinity() < 40 ? Str::Tier1 :
-                           bond.affinity() < 60 ? Str::Tier2 : bond.affinity() < 80 ? Str::Tier3 : Str::Tier4;
+        static const Str kTiers[10] = {
+            Str::Tier0, Str::Tier1, Str::Tier2, Str::Tier3, Str::Tier4,
+            Str::Tier5, Str::Tier6, Str::Tier7, Str::Tier8, Str::Tier9};
+        const Str tierId = kTiers[bond.tier_index()];
+        static const Str kTraitStrPanel[8] = {
+            Str::TraitExtroversion, Str::TraitClinginess, Str::TraitCuriosity, Str::TraitLaziness,
+            Str::TraitTimidity, Str::TraitLiveliness, Str::TraitMischief, Str::TraitCharm};
+        int sumA = 0, sumB = 1;
+        pet::personality_top2(p, &sumA, &sumB);
         std::wstring status;
         if (player.current() == pet::ActionKind::Sleep) status = T(Str::StatusSleep);
         else if (player.active()) status = widen(pet::action_name_tr(player.current()));
@@ -903,9 +944,13 @@ int main(int argc, char** argv) {
         rows.push_back({T(Str::RowAdopted), widen(adopted) + Tf(Str::AdoptedDaysFmt, days_since(adopted) + 1)});
         rows.push_back({T(Str::RowStatus), status});
         rows.push_back({T(Str::HeadAffinity), L"", -1, true});
-        rows.push_back({T(Str::RowAffinity), fmt(L"%.1f", bond.affinity()), bond.affinity01(), false, true});
-        rows.push_back({T(Str::RowStage), T(tierId)});
+        rows.push_back({T(Str::RowAffinity),
+                        Tf(Str::AffinityLevelFmt, bond.level(), pet::tr(tierId)),
+                        bond.level_progress01(), false, true});
+        rows.push_back({T(Str::RowStage),
+                        fmt(L"%.1f / %.1f", bond.xp_into_level(), bond.xp_needed_for_level())});
         rows.push_back({T(Str::HeadPersonality), L"", -1, true});
+        rows.push_back({T(Str::RowSummary), Tf(Str::TraitJoinFmt, pet::tr(kTraitStrPanel[sumA]), pet::tr(kTraitStrPanel[sumB]))});
         const struct { Str n; float v; } traits[] = {
             {Str::TraitMischief, p.mischief}, {Str::TraitCuriosity, p.curiosity}, {Str::TraitCharm, p.charm}, {Str::TraitExtroversion, p.extroversion},
             {Str::TraitLiveliness, p.liveliness}, {Str::TraitClinginess, p.clinginess}, {Str::TraitLaziness, p.laziness}, {Str::TraitTimidity, p.timidity}};
@@ -1536,6 +1581,7 @@ int main(int argc, char** argv) {
     tips.on_unload();
     memoDialog.close();
     rename.close();
+    personalityDlg.close();
     bubble.destroy();
     tray.destroy();
     audio.release();

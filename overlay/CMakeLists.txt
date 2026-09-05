@@ -33,6 +33,7 @@ add_library(pet_overlay STATIC
     src/audio.cpp
     src/user_data.cpp
     src/rename_dialog.cpp
+    src/personality_dialog.cpp
     src/memo_dialog.cpp
     src/stats_panel.cpp
     src/ui_style.cpp

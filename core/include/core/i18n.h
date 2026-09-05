@@ -37,6 +37,7 @@ enum class Str : std::uint16_t {
     // 托盘菜单
     MenuShow, MenuHide, MenuStats, MenuMemo, MenuRename, MenuSound, MenuNameReminder,
     MenuWeatherUnset, MenuWeatherFmt, MenuAutostart, MenuLanguage, MenuExit,
+    MenuPersonality,
     // 对话框
     Ok, Cancel, RenameTitle, RenameHint, WeatherTitle,
     MemoTitle, MemoAdd, MemoRemove, MemoClose, MemoContent, MemoTime, MemoHintDefault, MemoHintAdded,
@@ -46,9 +47,13 @@ enum class Str : std::uint16_t {
     RowName, RowBreed, RowToday, RowAdopted, AdoptedDaysFmt, RowStatus, RowAffinity, RowStage,
     RowLaunch, RowPetsHits, RowBalls, RowSave, TimesFmt, PetsHitsFmt,
     StatusSleep, StatusIdle, StatusObedientFmt,
-    Tier0, Tier1, Tier2, Tier3, Tier4,
+    Tier0, Tier1, Tier2, Tier3, Tier4, Tier5, Tier6, Tier7, Tier8, Tier9,
     TraitMischief, TraitCuriosity, TraitCharm, TraitExtroversion, TraitLiveliness, TraitClinginess, TraitLaziness, TraitTimidity,
     Breed,
+    AffinityLevelFmt,   // "Lv.%d · %s"
+    TraitJoinFmt,       // "%s · %s" 性格摘要
+    RowSummary,         // "性格摘要"
+    PersonalityTitle, PersonalityHint, PersonalityReroll,
     // 插件
     DrinkWater, StandUp, MemoPrefix,
     WeatherLineFmt, WeatherHiLoFmt, WeatherNotFoundFmt, WeatherNetFail, WeatherDataBad,

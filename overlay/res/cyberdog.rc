@@ -18,8 +18,8 @@ IDI_JDOG ICON "cyberdog.ico"
 209 RCDATA "sounds/bark_soft.wav"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION    1,1,0,0
- PRODUCTVERSION 1,1,0,0
+ FILEVERSION    1,3,0,0
+ PRODUCTVERSION 1,3,0,0
  FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
  FILEFLAGS      0
  FILEOS         VOS_NT_WINDOWS32
@@ -32,12 +32,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Ldy"
             VALUE "FileDescription",  "CyberDog desktop pet"
-            VALUE "FileVersion",      "1.1.0.0"
+            VALUE "FileVersion",      "1.3.0.0"
             VALUE "InternalName",     "CyberDog"
             VALUE "LegalCopyright",   "Ldy. Private build."
             VALUE "OriginalFilename", "CyberDog.exe"
             VALUE "ProductName",      "CyberDog"
-            VALUE "ProductVersion",   "1.1"
+            VALUE "ProductVersion",   "1.3"
         END
     END
     BLOCK "VarFileInfo"

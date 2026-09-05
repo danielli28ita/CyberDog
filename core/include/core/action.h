@@ -71,6 +71,8 @@ class ActionSelector {
 public:
     ActionSelector(const Personality& p, std::uint64_t seed);
 
+    void set_personality(const Personality& p) { p_ = p; }
+
     // 内部需求随时间漂移。dt 秒。
     void drift(float dt);
 
@@ -106,6 +108,10 @@ private:
     bool   obedient_ = false;
     bool   roamAllowed_ = true;
 };
+
+// CyberDog 1.2：性格→行为扩展钩。默认恒为 1，不改变现有打分。
+// 以后版本可在此按 ActionKind / 性格覆写倍率；本版禁止改 action_catalog 权重。
+inline float personality_behavior_scale(ActionKind /*k*/) { return 1.0f; }
 
 // ---------------------------------------------------------------------------
 

@@ -32,6 +32,7 @@ enum class TrayCommand {
     LangEn = 11,
     LangIt = 12,
     OpenData = 13,
+    Personality = 14,
 };
 
 class TrayIcon {

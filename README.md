@@ -40,9 +40,17 @@ A 3D beagle that lives on the Windows taskbar. Its hind legs are hidden behind t
 
   Affinity is now a level/XP track (Lv.1–10); petting raises it faster than hitting or long idle lowers it.
 
-旧版 [1.0](https://github.com/danielli28ita/CyberDog/releases/tag/v1.0) / [1.1](https://github.com/danielli28ita/CyberDog/releases/tag/v1.1) 仍可下载。
+## 1.3 有什么新的
 
-Older [1.0](https://github.com/danielli28ita/CyberDog/releases/tag/v1.0) / [1.1](https://github.com/danielli28ita/CyberDog/releases/tag/v1.1) releases stay available.
+## What’s new in 1.3
+
+- 托盘菜单「性格…」可拖滑条改八维，或点「重新随机」再摇一套；确定后立刻生效并写入存档。
+
+  Tray menu "Personality…" lets you edit the eight traits with sliders, or tap "Reroll" for a new draw; OK applies and saves at once.
+
+旧版 [1.0](https://github.com/danielli28ita/CyberDog/releases/tag/v1.0) / [1.1](https://github.com/danielli28ita/CyberDog/releases/tag/v1.1) / [1.2](https://github.com/danielli28ita/CyberDog/releases/tag/v1.2) 仍可下载（有则保留）。
+
+Older releases stay available when published.
 
 ## 它会做什么
 

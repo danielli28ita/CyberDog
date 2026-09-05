@@ -131,25 +131,29 @@ void test_bond() {
     std::printf("亲密度\n");
     pet::Bond b(30.0f);
     for (int i = 0; i < 10; ++i) b.apply(pet::BondEvent::Pet, 1.0f);
-    check(b.affinity() > 32.9f && b.affinity() < 33.1f, "摸十秒只涨 3 点（一分钟内封顶 3 点）");
+    check(b.affinity() > 34.9f && b.affinity() < 35.1f, "摸十秒只涨 5 点（一分钟内封顶 5 点）");
     b.decay(61.0f);
     b.apply(pet::BondEvent::Pet, 1.0f);
-    check(b.affinity() > 34.4f, "一分钟后窗口重置，又能涨");
+    check(b.affinity() > 36.4f, "一分钟后窗口重置，又能涨");
     const float before = b.affinity();
     for (int i = 0; i < 20; ++i) b.apply(pet::BondEvent::Hit);
-    check(before - b.affinity() <= 3.01f, "连打二十下一分钟内最多掉 3 点（难掉）");
+    check(before - b.affinity() <= 1.01f, "连打二十下一分钟内最多掉 1 点（难掉）");
     check(b.obedient(), "打过之后处于「乖」状态");
-    pet::Bond low(11.0f);
+    pet::Bond low(9.0f);
     for (int i = 0; i < 5; ++i) low.apply(pet::BondEvent::Hit);
     check(low.affinity() >= pet::Bond::kFloor, "打不穿软下限");
     pet::Bond d(50.0f);
-    d.decay(600.0f);
+    d.decay(1200.0f);
     const float afterGrace = d.affinity();
     d.decay(3600.0f);
-    check(afterGrace == 50.0f && d.affinity() < 49.5f && d.affinity() > 48.5f, "十分钟内不掉，之后每小时掉 1 点");
-    pet::Bond top(99.5f);
+    check(afterGrace == 50.0f && d.affinity() < 49.6f && d.affinity() > 49.4f, "二十分钟内不掉，之后每小时掉 0.5 点");
+    pet::Bond top(199.5f);
     top.apply(pet::BondEvent::Pet, 5.0f);
-    check(top.affinity() == 100.0f, "上限 100");
+    check(top.affinity() == 200.0f, "上限 200");
+    pet::Bond lv(42.0f);
+    check(lv.level() == 4 && lv.tier_index() == 3, "42 点是 Lv.4");
+    check(lv.xp_into_level() > 11.9f && lv.xp_into_level() < 12.1f, "Lv.4 已走 12 点");
+    check(lv.level_progress01() > 0.79f && lv.level_progress01() < 0.81f, "Lv.4 进度约 80%");
 }
 
 void test_save() {
@@ -178,6 +182,31 @@ void test_personality() {
     check(ok, "两千个种子：捣蛋高于好奇，且不取满值");
     const pet::Personality a = pet::personality_from_seed(42), b = pet::personality_from_seed(42);
     check(std::memcmp(&a, &b, sizeof(a)) == 0, "同种子同性格");
+    int t0 = -1, t1 = -1, u0 = -1, u1 = -1;
+    pet::personality_top2(a, &t0, &t1);
+    pet::personality_top2(a, &u0, &u1);
+    check(t0 == u0 && t1 == u1 && t0 >= 0 && t0 < 8 && t1 >= 0 && t1 < 8 && t0 != t1, "同种子摘要稳定且两项不同");
+    const pet::Personality other = pet::personality_from_seed(99);
+    int o0 = -1, o1 = -1;
+    pet::personality_top2(other, &o0, &o1);
+    // 不同种子通常摘要不同；不强制，只要求函数可调用且合法。
+    check(o0 != o1, "另一只狗摘要两项不同");
+    pet::Personality edited = a;
+    edited.curiosity = 0.99f;
+    edited.mischief = 0.5f;
+    pet::personality_enforce_invariants(edited);
+    check(edited.mischief >= pet::kMischiefFloor && edited.curiosity < edited.mischief, "手改后仍满足不变量");
+    pet::SaveData ps;
+    pet::personality_save(ps, a);
+    pet::Personality loaded{};
+    check(pet::personality_try_load(ps, loaded), "性格写入存档");
+    bool same = true;
+    const float* aa = &a.extroversion;
+    const float* bb = &loaded.extroversion;
+    for (int i = 0; i < 8; ++i) {
+        if (aa[i] < bb[i] - 0.001f || aa[i] > bb[i] + 0.001f) same = false;
+    }
+    check(same, "性格存档往返");
 }
 
 void test_sound() {

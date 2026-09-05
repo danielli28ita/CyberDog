@@ -28,6 +28,7 @@ constexpr UINT kMenuLangZh = 40010;
 constexpr UINT kMenuLangEn = 40011;
 constexpr UINT kMenuLangIt = 40012;
 constexpr UINT kMenuOpenData = 40013;
+constexpr UINT kMenuPersonality = 40014;
 
 }  // namespace
 
@@ -200,6 +201,7 @@ bool TrayIcon::handle_message(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT
             case kMenuLangEn: c = TrayCommand::LangEn; break;
             case kMenuLangIt: c = TrayCommand::LangIt; break;
             case kMenuOpenData: c = TrayCommand::OpenData; break;
+            case kMenuPersonality: c = TrayCommand::Personality; break;
             default: return false;
         }
         if (onCommand_) onCommand_(c);
@@ -217,7 +219,7 @@ bool TrayIcon::handle_message(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT
         // 1.6 起菜单项自绘（ui_style），和属性面板一个风格。项的数据放在 menuItems_ 里，
         // WM_MEASUREITEM / WM_DRAWITEM 到 owner 窗口，handle_message 上面截下来画。
         menuItems_.clear();
-        menuItems_.reserve(16);   // 不许再增长：项里存的是指针，vector 重新分配会让菜单指向旧内存
+        menuItems_.reserve(20);   // 不许再增长：项里存的是指针，vector 重新分配会让菜单指向旧内存
         if (menu_) DestroyMenu(menu_);
         menu_ = CreatePopupMenu();
         HMENU menu = menu_;
@@ -231,6 +233,7 @@ bool TrayIcon::handle_message(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT
         add(menu, kMenuStats, W(Str::MenuStats));
         add(menu, kMenuMemo, W(Str::MenuMemo));
         add(menu, kMenuRename, W(Str::MenuRename));
+        add(menu, kMenuPersonality, W(Str::MenuPersonality));
         add(menu, kMenuSound, W(Str::MenuSound), soundOn_);
         add(menu, kMenuNameReminder, W(Str::MenuNameReminder), nameReminder_);
         {

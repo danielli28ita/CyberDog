@@ -58,6 +58,8 @@ class GazeController {
 public:
     GazeController(const Personality& p, std::uint64_t seed);
 
+    void set_personality(const Personality& p) { p_ = p; }
+
     // dt 单位秒。调用方要把它夹在合理范围（渲染停了一分钟再回来，dt 不该是 60）。
     void update(float dt, const GazeInput& in);
 

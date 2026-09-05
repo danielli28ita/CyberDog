@@ -102,6 +102,7 @@ float ActionSelector::score(ActionKind k, const ActionContext& ctx, double now) 
     // 近期重复惩罚：刚做过的打折，90 秒恢复。只加这一项就能消除重复感（设计文档 §2.3 L1）。
     const double since = now - lastPlayed_[static_cast<int>(k)];
     s -= 1.2f * static_cast<float>(std::exp(-since / 90.0));
+    s *= personality_behavior_scale(k);
     return s;
 }
 
