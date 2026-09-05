@@ -9,6 +9,9 @@ docs/
 dist/
 _archive/
 **/_archive/
+AGENTS.md
+CLAUDE.md
+.cursor/
 
 # 运行时数据（程序旁边的 CyberDog-data\，2.0 起；改名前叫 Jdog-data）
 CyberDog-data/

@@ -48,9 +48,9 @@ A 3D beagle that lives on the Windows taskbar. Its hind legs are hidden behind t
 
   Tray menu "Personality…" lets you edit the eight traits with sliders, or tap "Reroll" for a new draw; OK applies and saves at once.
 
-旧版 [1.0](https://github.com/danielli28ita/CyberDog/releases/tag/v1.0) / [1.1](https://github.com/danielli28ita/CyberDog/releases/tag/v1.1) / [1.2](https://github.com/danielli28ita/CyberDog/releases/tag/v1.2) 仍可下载（有则保留）。
+旧版 [1.0](https://github.com/danielli28ita/CyberDog/releases/tag/v1.0) / [1.1](https://github.com/danielli28ita/CyberDog/releases/tag/v1.1) 仍可下载；1.2 的改动并入了 1.3。
 
-Older releases stay available when published.
+Older releases 1.0 and 1.1 stay available; 1.2 was folded into 1.3.
 
 ## 它会做什么
 
