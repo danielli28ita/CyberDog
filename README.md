@@ -7,10 +7,6 @@
 <p align="center">
 <img src="screenshots/showcase.png" width="560" alt="CyberDog：属性面板和站在任务栏上的比格" />
 </p>
-<p>
-<img src="screenshots/standing.png" width="310" alt="站在任务栏上" />
-<img src="screenshots/sleeping.png" width="310" alt="睡在垫子上" />
-</p>
 
 一条住在 Windows 任务栏上的 3D 比格犬。C++20，Win32 + Direct3D 12 + DirectComposition，单个 exe，静态链接，不装东西。默认不联网；只有你在托盘里填了天气城市，它才会在启动时查一次天气。
 
