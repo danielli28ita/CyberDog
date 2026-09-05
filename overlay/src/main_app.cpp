@@ -55,7 +55,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.0";   // CyberDog 1.0（改名前的 Jdog 版本号到 2.0 为止，作者定名后从 1.0 重新计）
+constexpr const char* kVersion = "1.1";   // CyberDog 版本号（改名前的 Jdog 版本号到 2.0 为止，定名后从 1.0 重新计）
 
 // 开机自启：HKCU\Software\Microsoft\Windows\CurrentVersion\Run 下一个键。用户自己在托盘菜单里开关。
 constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
