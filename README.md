@@ -166,3 +166,7 @@ Three layers: `core\` is the platform-independent dog (actions, personality, aff
 MIT，见 `LICENSE`。天气数据来自 [Open-Meteo](https://open-meteo.com/)，地名来自 [OpenStreetMap Nominatim](https://nominatim.org/)。叫声录音来自 CC0 素材库，见 `overlay/res/sounds/CREDITS.txt`。
 
 MIT, see `LICENSE`. Weather from [Open-Meteo](https://open-meteo.com/), place names from [OpenStreetMap Nominatim](https://nominatim.org/). Dog sounds are CC0 recordings, see `overlay/res/sounds/CREDITS.txt`.
+
+开发辅助：Cursor。
+
+Built with Cursor.
