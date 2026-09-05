@@ -4,10 +4,12 @@
 
 **下载 / Download：[最新版 exe（Releases）](https://github.com/danielli28ita/CyberDog/releases/latest)** —— 单个文件，双击即用，Windows 10/11。
 
+<p align="center">
+<img src="screenshots/showcase.png" width="560" alt="CyberDog：属性面板和站在任务栏上的比格" />
+</p>
 <p>
 <img src="screenshots/standing.png" width="310" alt="站在任务栏上" />
 <img src="screenshots/sleeping.png" width="310" alt="睡在垫子上" />
-<img src="screenshots/stats.png" width="200" alt="属性面板" />
 </p>
 
 一条住在 Windows 任务栏上的 3D 比格犬。C++20，Win32 + Direct3D 12 + DirectComposition，单个 exe，静态链接，不装东西。默认不联网；只有你在托盘里填了天气城市，它才会在启动时查一次天气。
@@ -215,6 +217,8 @@ MIT，见 `LICENSE`。天气数据来自 [Open-Meteo](https://open-meteo.com/)�
 # CyberDog (English)
 
 **Download: [latest exe (Releases)](https://github.com/danielli28ita/CyberDog/releases/latest)** — one file, double-click to run, Windows 10/11.
+
+<p align="center"><img src="screenshots/showcase.png" width="560" alt="CyberDog: stats panel and the beagle on the taskbar" /></p>
 
 A 3D beagle that lives on the Windows taskbar. C++20, Win32 + Direct3D 12 + DirectComposition, a single statically linked exe, nothing to install. Offline by default; it only fetches the weather once per launch if you set a city in the tray menu.
 
